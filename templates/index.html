@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<link rel="stylesheet" href="style.css">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nakshatra</title>
+</head>
+<body>
+    <form method="POST" enctype="multipart/form-data" action="/render-image">
+        <label for="file1">Select red FITS file:</label>
+        <input type="file" id="file1" name="file1">
+        <br>
+        <label for="file2">Select blue FITS file:</label>
+        <input type="file" id="file2" name="file2">
+        <br><br>
+        <input type="submit" value="Upload">
+      </form>
+    <img src="../static/image.png" alt="image">
+</body>
+</html>
