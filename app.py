@@ -1,33 +1,3 @@
-# from flask import Flask, request, render_template, jsonify
-# from astropy.io import fits
-# import matplotlib
-# matplotlib.use('Agg')
-# import matplotlib.pyplot as plt
-# import numpy as np
-# import json
-
-# app = Flask(__name__, template_folder='templates')
-
-# data = None
-
-# @app.route('/upload-fits-file', methods=['POST'])
-# def upload_fits_file():
-#     file = request.files['fits-file']
-#     hdul = fits.open(file, mode='update')
-#     data = hdul[0].data
-#     plt.imshow(data)
-#     plt.savefig('static/image.png')
-#     hdul.close()
-#     return render_template('index.html')
-
-# @app.route('/')
-# def index():
-#     return render_template('index.html')
-
-# if __name__ == '__main__':
-#     app.run(debug=True)
-
-
 from flask import Flask, render_template, request, url_for, send_from_directory
 from astropy.io import fits
 import matplotlib.pyplot as plt
@@ -42,7 +12,7 @@ app = Flask(__name__)
 
 @app.route('/render', methods=['POST'])
 def render():
-    print(os.getcwd())
+    # print(os.getcwd())
     if request.method == 'POST':
         rcParams['figure.figsize'] = [8., 8.]
         file1 = request.files['file1']
@@ -75,9 +45,11 @@ def render():
         greendata = (data1 + data2) / 2
 
         image_data = np.dstack((data1, greendata, data2))
+        plt.figure()
         plt.imshow(image_data)
         plt.axis('off')
-        plt.savefig(os.path.join('static', 'image.png'))
+        plt.show(block=False)
+        # plt.savefig(os.path.join('static', 'image.png'))
 
         data1 = mirror_data(data1)
         data2 = mirror_data(data2)
@@ -93,8 +65,19 @@ def render():
             color_index = abs(color_index)
             temp = 4600*(1/(0.92*color_index + 1.7) + 1/(0.92*color_index) + 0.62)
             temperatures.append(temp)
+        # print(len(temperatures))
+        # for i in range(len(temperatures)):
+        #     print(temperatures[i])
+        x_values = objects['x']
+        y_values = objects['y']
+        create_scatter_plot(x_values, y_values, temperatures)
+        # plt.close()
+        fig = plt.gcf()
+        # fig.show(block=False)
+        fig.canvas.mpl_connect('motion_notify_event', lambda event: on_move(event, x_values, y_values, temperatures))
+        plt.waitforbuttonpress()
+        plt.close()
 
-        plt.clf()
     return render_template('index.html', image_url=url_for('static', filename='image.png'))
 
 @app.route('/', methods=['GET', 'POST'])
@@ -105,7 +88,43 @@ def index():
 def custom_static(filename):
     return send_from_directory(app.static_folder, filename)
 
-###         TEMPERATURE CALCULATION         ###
+###############################################
+
+def on_move(event, x_values, y_values, temperatures):
+    if event.inaxes:
+        x, y = event.xdata, event.ydata
+        min_distance = float('inf')
+        min_index = None
+        for i in range(len(x_values)):
+            distance = math.sqrt((x_values[i] - x)**2 + (y_values[i] - y)**2)
+            if distance < min_distance:
+                min_distance = distance
+                min_index = i
+        if min_index is not None:
+            plt.title(f'Temperature: {temperatures[min_index]}')
+        else:
+            plt.title('')
+
+def create_scatter_plot(x_values, y_values, temperatures):
+    fig, ax = plt.subplots()
+    ax.scatter(x_values, y_values)
+    for i, temp in enumerate(temperatures):
+        ax.annotate(temp, (x_values[i], y_values[i]), textcoords="offset points", xytext=(10, 10), ha='center')
+    def format_coord(x, y):
+        x_index = int(x + 0.5)
+        y_index = int(y + 0.5)
+        if x_index >= 0 and x_index < len(x_values) and y_index >= 0 and y_index < len(y_values):
+            return f'Temperature: {temperatures[x_index]}'
+        else:
+            return 'Temperature: N/A'
+    ax.format_coord = format_coord
+    # plt.show()
+
+
+###############################################
+##########  TEMPERATURE CALCULATION  ##########
+###############################################
+
 def mirror_data(data):
     dataout = np.array(data)
     rows = len(data)
@@ -116,49 +135,27 @@ def mirror_data(data):
     return dataout
 
 def get_image_data(filename, mirror=False):
-    # process filename as FITS file
-    
-
-    data = fits.getdata(filename)
-    
+    data = fits.getdata(filename)    
     if mirror==True:
         data = mirror_data(data)
-
     data = data.byteswap().newbyteorder()
-    
     return data
 
 def subtract_background(data):
-      # measure a spatially varying background on the image
     data = data.astype(np.float)
     bkg = sep.Background(data)
-    
-    # evaluate background as 2-d array, same size as original image
-    bkg_image = bkg.back()
-    # bkg_image = np.array(bkg) # equivalent to above
-    
-    # evaluate the background noise as 2-d array, same size as original image
-    bkg_rms = bkg.rms()
     data_sub = data - bkg
-    
     return data_sub, bkg
 
 def extract_sources(data_sub, bkg, x1, y1, x2, y2):
-    # perform the extraction
     objects = sep.extract(data_sub, 20, err=bkg.globalrms,minarea = 100)
-    
-    # display the image
     from matplotlib.patches import Ellipse
-
-    # plot background-subtracted image
     fig, ax = plt.subplots()
     m, s = np.mean(data_sub), np.std(data_sub)
     im = ax.imshow(data_sub, interpolation='nearest', cmap='gray',
                vmin=m-s, vmax=m+s, origin='lower')
     plt.xlim(x1,x2)
     plt.ylim(y1,y2)
-
-    # plot an ellipse for each object
     for i in range(len(objects)):
         e = Ellipse(xy=(objects['x'][i], objects['y'][i]),
                 width=6*objects['a'][i],
@@ -167,8 +164,7 @@ def extract_sources(data_sub, bkg, x1, y1, x2, y2):
         e.set_facecolor('none')
         e.set_edgecolor('red')
         ax.add_artist(e)
-    plt.show()
-    
+    # plt.show()
     return objects
 
 def get_target_flux(objects, red_data_sub, red_bkg, blue_data_sub, blue_bkg):
