@@ -1,7 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
 
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='style.css') }}">
+
+<style>
+    body {
+        background-image: url("{{ url_for('static', filename='bg-img.jpg') }}");
+    }
+</style>
 
 <head>
     <meta charset="UTF-8">
@@ -10,7 +16,7 @@
     <title>Nakshatra</title>
 </head>
 <body>
-    <form method="POST" enctype="multipart/form-data" action="/render-image">
+    <form method="POST" enctype="multipart/form-data" action="/render">
         <label for="file1">Select red FITS file:</label>
         <input type="file" id="file1" name="file1">
         <br>
@@ -19,6 +25,6 @@
         <br><br>
         <input type="submit" value="Upload">
       </form>
-    <img src="../static/image.png" alt="image">
+      <img src="{{ image_url }}">
 </body>
 </html>
